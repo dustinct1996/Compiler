@@ -92,6 +92,14 @@ void LIT(int R, int L, int M)
     RF[R] = M;
 }
 
+// 02 – RTN(0, 0, 0) Returns from a subroutine and restore the caller environment
+void RTN(int R, int L, int M)
+{
+    SP = BP - 1;
+    BP = stack[SP + 3];
+    PC = stack[SP + 4];
+}
+
 // 03 – LOD(R, L, M) Load value from a selected stack index into the register
 // location at offset M from L lexicographical levels down
 void LOD(int R, int L, int M)
@@ -104,6 +112,23 @@ void LOD(int R, int L, int M)
 void STO(int R, int L, int M)
 {
     stack[base(L, BP) + M] = RF[R];
+}
+
+//05 – CAL(0, L, M) Call procedure at code index M (generates new Activation
+// Record and pc <- M)
+void CAL(int R, int L, int M)
+{
+    // Space to return value.
+    stack[SP + 1] = 0;
+    // Static Link (SL)
+    stack[SP + 2] = base(L, BP);
+    // Dynamic Link (DL)
+    stack[SP + 3] = BP;
+    // Return Address (RA)
+    stack[SP + 4] = PC;
+
+    BP = SP + 1;
+    PC = M;
 }
 
 // 06 – INC(0, 0, M) Allocate M locals (increment sp by M). First four are
@@ -288,6 +313,7 @@ void VM(instruction *text, FILE *output)
             break;
 
             case 2:
+            RTN(0, 0, 0);
             break;
 
             // LOD
@@ -301,6 +327,7 @@ void VM(instruction *text, FILE *output)
             break;
 
             case 5:
+            CAL(0, IR.L, IR.M);
             break;
 
             // INC
