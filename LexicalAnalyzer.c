@@ -1,3 +1,8 @@
+// Names: Christian Young, Dustin Thompson
+// NIDs: ch890408, du738547
+// Course: COP 3402
+// Term: SPRING 2020
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -137,14 +142,20 @@ int isReservedWord(char* string)
         return whilesym;
     else if(strcmp(string, "do") == 0)
         return dosym;
+    else if(strcmp(string, "call") == 0)
+        return callsym;
     else if(strcmp(string, "const") == 0)
         return constsym;
     else if(strcmp(string, "var") == 0)
         return varsym;
+    else if(strcmp(string, "procedure") == 0)
+        return procsym;
     else if(strcmp(string, "write") == 0)
         return writesym;
     else if(strcmp(string, "read") == 0)
         return readsym;
+    else if(strcmp(string, "else") == 0)
+        return elsym;
         
     return 0;
 }
@@ -156,7 +167,7 @@ char **LexicallyAnalyze(FILE *input, FILE *output)
     char *str = calloc(11, sizeof(char));
     char *sp = calloc(3, sizeof(char));
     char ch = '\0', c;
-
+    
     // Prints the first part of the output specifications and rewinds the file pointer.
     c = fgetc(input);
     fprintf(output, "Scanner input:\n\n");
