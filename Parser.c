@@ -1,3 +1,8 @@
+// Names: Christian Young, Dustin Thompson
+// NIDs: ch890408, du738547
+// Course: COP 3402
+// Term: SPRING 2020
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,39 +44,39 @@ const char *error[] =
     // 2
     "Identifier must be followed by '='.",
     // 3
-    "const, var, write must be followed by identifier.",
+    "const, var, write, procedure must be followed by identifier.",
     // 4
     "Semicolon or comma missing.",
     // 5
-    "Statement expected.",
+    "Incorrect symbol after procedure declaration.",
     // 6
-    "Incorrect symbol after statement part in block.",
+    "Statement expected.",
     // 7
-    "Period expected.",
+    "Incorrect symbol after statement part in block.",
     // 8
-    "Semicolon between statements missing.",
+    "Period expected.",
     // 9
     "Undeclared identifier.",
     // 10
-    "Assignment operator expected.",
+    "Assignment to constant or procedure is not allowed.",
     // 11
-    "\'then\' expected.",
+    "Assignment operator expected.",
     // 12
-    "Semicolon or \'}\' expected.",
+    "\'call\' must be followed by an identifier.",
     // 13
-    "\'do\' expected.",
+    "Call of a constant or variable is meaningless.",
     // 14
-    "Incorrect symbol following statement.",
+    "\'then\' expected.",
     // 15
-    "Relational operator expected.",
+    "\'do\' expected.",
     // 16
-    "Right parenthesis missing.",
+    "Relational operator expected.",
     // 17
-    "The preceding factor cannot begin with this symbol.",
+    "Expression must not contain a procedure.",
     // 18
-    "An expression cannot begin with this symbol.",
+    "Right parenthesis missing.",
     // 19
-    "This number is too large.",
+    "An expression cannot begin with this symbol.",
 };
 
 typedef struct symbol
@@ -120,8 +125,14 @@ int level;
 int address;
 // Search index
 int searchx;
-
+// flag for end.
 int flag;
+// Line number to keep track of the PC (for procedures).
+int lineNumber;
+// a array;
+int *a;
+// a counter;
+int ax;
 
 void ERROR(int error_code, FILE *output)
 {
@@ -150,7 +161,7 @@ void GET_TOKEN(char **lexemeList)
 }
 
 // Searches for something in the symbol table.
-int search(int tok)
+int search()
 {
     for (searchx = 0; searchx < MAX_SYMBOL_TABLE_SIZE; searchx++)
     {
@@ -180,13 +191,17 @@ void emit(int OP, int R, int L, int M)
     text[cx].L = L;
     text[cx].M = M;
     cx++;
+    lineNumber++;
 }
 
 void factor(char **lexemeList, FILE *output)
 {
-    if (token == identsym)
+    if (token == procsym)
+        ERROR(17, output);
+
+    else if (token == identsym)
     {
-        if (!search(token))
+        if (!search())
             ERROR(9, output);
         
         // Load the identifier
@@ -195,7 +210,7 @@ void factor(char **lexemeList, FILE *output)
 
         // Lit if it is a const.
         if (symbol_table[searchx].kind == 1)
-            emit(1, regPointer, level, symbol_table[searchx].val);
+            emit(1, 0, level, symbol_table[searchx].val);
         
         GET_TOKEN(lexemeList);
     }
@@ -204,7 +219,7 @@ void factor(char **lexemeList, FILE *output)
     {
         GET_TOKEN(lexemeList);
         // Literal
-        emit(1, regPointer, level, num);
+        emit(1, 0, level, num);
     }
     
     else if (token == lparentsym)
@@ -212,13 +227,13 @@ void factor(char **lexemeList, FILE *output)
         GET_TOKEN(lexemeList);
         expression(lexemeList, output);
         if (token != rparentsym)
-            ERROR(16, output);
+            ERROR(18, output);
         
         GET_TOKEN(lexemeList);
     }
 
     else
-        ERROR(17, output);
+        ERROR(19, output);
 }
 
 void term(char **lexemeList, FILE *output)
@@ -252,8 +267,8 @@ void expression(char **lexemeList, FILE *output)
         GET_TOKEN(lexemeList);
         term(lexemeList, output);
     
+        // Negate
         if (addop == minussym)
-            // Negate
             emit(12, regPointer, level, 0);
     }
     
@@ -266,11 +281,12 @@ void expression(char **lexemeList, FILE *output)
         GET_TOKEN(lexemeList);
         term(lexemeList, output);
 
+        // Add
         if (addop == plussym)
-            // Add
             emit(13, ++regPointer, level, regPointer);
+        
+        // Sub
         else
-            // Sub
             emit(14, ++regPointer, level, regPointer);
 
     }
@@ -291,14 +307,14 @@ void condition(char **lexemeList, FILE *output)
         addop = token;
         GET_TOKEN(lexemeList);
         expression(lexemeList, output);
-            
+
         if(addop != eqlsym)
           if(addop != neqsym)
             if(addop != lessym)
               if(addop != leqsym)
                 if(addop != gtrsym)
                   if(addop != geqsym)
-                    ERROR(15, output);
+                    ERROR(16, output);
                   else
                     emit(24, ++regPointer, level, regPointer);
                 else
@@ -318,33 +334,68 @@ void statement(char **lexemeList, FILE *output)
 {
     if (token == identsym)
     {
+        if (search(ident))
+            if (symbol_table[searchx].kind == 1)
+                ERROR(10, output);
+        
         flag = 1;
         GET_TOKEN(lexemeList);
-        if (token != becomessym)
-            ERROR(2, output);
+        if (token == periodsym)
+            ERROR(7, output);
+        else if (token != becomessym)
+            ERROR(11, output);
 
         GET_TOKEN(lexemeList);
         expression(lexemeList, output);
     }
+    
+    else if (token == callsym)
+    {
+        GET_TOKEN(lexemeList);
+
+        if (token != identsym)
+            ERROR(12, output);
+
+        if (search(ident))
+            if (symbol_table[searchx].kind == 1 || symbol_table[searchx].kind == 2)
+                ERROR(13, output);
+
+        stackPointer += 5;
+
+        // Call procedure at code index
+        // TODO: Fix
+        emit(5, 0, level++, a[ax] + 1);
+
+        GET_TOKEN(lexemeList);
+    }
 
     else if (token == beginsym)
     {
+        // Inc
+        emit(6, 0, 0, 6);
+        stackPointer += 5;
+
         GET_TOKEN(lexemeList);
+
+        if (token == semicolonsym)
+            ERROR(6, output);
+
         statement(lexemeList, output);
 
         while (token == semicolonsym)
         {
             if (flag == 1)
-                emit(4, regPointer, level, stackPointer);
+                emit(4, 0, level, regPointer++);
             flag = 0;
             GET_TOKEN(lexemeList);
             statement(lexemeList, output);
         }
 
         if (token != endsym)
-            ERROR(6, output);
+            ERROR(7, output);
 
-        GET_TOKEN(lexemeList);
+        if (!(lexemeList[tx] == NULL))
+            GET_TOKEN(lexemeList);
     }
 
     else if (token == ifsym)
@@ -353,10 +404,17 @@ void statement(char **lexemeList, FILE *output)
         condition(lexemeList, output);
 
         if (token != thensym)
-            ERROR(11, output);
+            ERROR(14, output);
         
         GET_TOKEN(lexemeList);
         statement(lexemeList, output);
+
+        if (token == elsym)
+        {
+            GET_TOKEN(lexemeList);
+            statement(lexemeList, output);
+        }
+
     }
 
     else if (token == whilesym)
@@ -371,7 +429,7 @@ void statement(char **lexemeList, FILE *output)
         emit(8, regPointer, level, 20);
         
         if (token != dosym)
-            ERROR(13, output);
+            ERROR(15, output);
         
         GET_TOKEN(lexemeList);
         statement(lexemeList, output);
@@ -379,9 +437,25 @@ void statement(char **lexemeList, FILE *output)
         text[cx2].M = cx;
     }
 
+    else if (token == readsym)
+    {
+        GET_TOKEN(lexemeList);
+        if (token != identsym)
+            ERROR(3, output);
+
+        if (token != semicolonsym)
+            ERROR(4, output);
+        
+        // SIO 2, read
+        emit(10, 0, 0, 2);
+
+        GET_TOKEN(lexemeList);
+    }
+
     else if (token == writesym)
     {
         GET_TOKEN(lexemeList);
+        // ?? might not need this
         if (token != identsym)
             ERROR(3, output);
         
@@ -391,7 +465,7 @@ void statement(char **lexemeList, FILE *output)
             ERROR(4, output);
         
         // SIO 1, write
-        emit(9, regPointer, level, 1);
+        emit(9, 0, 0, 1);
 
         GET_TOKEN(lexemeList);
     }
@@ -399,10 +473,7 @@ void statement(char **lexemeList, FILE *output)
 
 void block(char **lexemeList, FILE *output)
 {
-    // Initial inc.
-    emit(6, 0, 0, 7);
-    stackPointer += 6;
-
+    // Const dec
     if (token == constsym)
     {
         do
@@ -412,8 +483,10 @@ void block(char **lexemeList, FILE *output)
                 ERROR(3, output);
 
             GET_TOKEN(lexemeList);
-            if (token != eqlsym)
+            if (token == becomessym)
                 ERROR(0, output);
+            else if (token != eqlsym)
+                ERROR(2, output);
 
             GET_TOKEN(lexemeList);
             if (token != numbersym)
@@ -432,6 +505,7 @@ void block(char **lexemeList, FILE *output)
         GET_TOKEN(lexemeList);
     }
 
+    // Var dec
     if (token == varsym)
     {
         do
@@ -453,6 +527,41 @@ void block(char **lexemeList, FILE *output)
         GET_TOKEN(lexemeList);
     }
 
+    // Proc dec
+    if (token == procsym)
+    {
+        // Save the line number where this procedure was found
+        a[ax] = lineNumber;
+        // The jump to the first begin after the procedure
+        emit(7, 0, 0, 0);
+
+        GET_TOKEN(lexemeList);
+        if (token != identsym)
+            ERROR(3, output);
+        
+        GET_TOKEN(lexemeList);
+
+        if (token != semicolonsym)
+            ERROR(5, output);
+        
+        // Enter procedure into symbol table.
+        enter(3, ident, 0, level, 0);
+        
+        GET_TOKEN(lexemeList);
+
+        block(lexemeList, output);
+
+        if (token != semicolonsym)
+            ERROR(4, output);
+
+        emit(2, 0, 0, 0);
+        // Modify the instruction to jump to the line after this return ^
+        text[a[ax]].M = lineNumber;
+        ax++;
+        
+        GET_TOKEN(lexemeList);
+    }
+
     statement(lexemeList, output);
 }
 
@@ -461,7 +570,7 @@ void program(char **lexemeList, FILE *output)
     GET_TOKEN(lexemeList);
     block(lexemeList, output);
     if (token != periodsym)
-        ERROR(7, output);
+        ERROR(8, output);
     else
         // SIO 3 - End program
         emit(11, 0, 0, 3);
@@ -473,14 +582,18 @@ instruction *Parse(char **lexemeList, FILE *output)
     text = malloc(sizeof(instruction) * MAX_CODE_LENGTH);
     ident = malloc(sizeof(char) * 12);
     tx = 0, cx = 0, sx = 0, token = 0, regPointer = 0, level = 0, address = 0;
-    stackPointer = 0, searchx = 0;
+    stackPointer = 0, searchx = 0, lineNumber = 0, flag = 0;
     int i = 0;
-    flag = 0;
+    int PC = 0;
+    a = calloc(100, sizeof(int));
+    ax = 0;
 
     if (isParserArg())
         fprintf(output, "Parser Output:\n\n");
 
     program(lexemeList, output);
+
+    // Modify the jumps for procedures here
 
     if (isParserArg())
     {
@@ -488,7 +601,7 @@ instruction *Parse(char **lexemeList, FILE *output)
         fprintf(output, "Code Generator Output:\n\n");
         while (text[i].op != 0)
         {
-            fprintf(output, "%d %d %d %d\n", text[i].op, text[i].R, text[i].L, text[i].M);
+            fprintf(output, "%d. %d %d %d %d\n", PC++, text[i].op, text[i].R, text[i].L, text[i].M);
             i++;
         }
 
