@@ -17,6 +17,8 @@ typedef struct instruction
     int M;
 } instruction;
 
+int isVMArg();
+
 const char opStrings[24][4] =
 {
     "lit\0",
@@ -90,15 +92,7 @@ void LIT(int R, int L, int M)
     RF[R] = M;
 }
 
-// 02 – RTN(0, 0, 0) Returns from a subroutine and restore the caller environment
-void RTN(int R, int L, int M)
-{
-    SP = BP - 1;
-    BP = stack[SP + 3];
-    PC = stack[SP + 4];
-}
-
-// 03 – LOD(R, L, M) Load value into a selected register from the stack
+// 03 – LOD(R, L, M) Load value from a selected stack index into the register
 // location at offset M from L lexicographical levels down
 void LOD(int R, int L, int M)
 {
@@ -110,23 +104,6 @@ void LOD(int R, int L, int M)
 void STO(int R, int L, int M)
 {
     stack[base(L, BP) + M] = RF[R];
-}
-
-//05 – CAL(0, L, M) Call procedure at code index M (generates new Activation
-// Record and pc <- M)
-void CAL(int R, int L, int M)
-{
-    // Space to return value.
-    stack[SP + 1] = 0;
-    // Static Link (SL)
-    stack[SP + 2] = base(L, BP);
-    // Dynamic Link (DL)
-    stack[SP + 3] = BP;
-    // Return Address (RA)
-    stack[SP + 4] = PC;
-
-    BP = SP + 1;
-    PC = M;
 }
 
 // 06 – INC(0, 0, M) Allocate M locals (increment sp by M). First four are
@@ -149,28 +126,9 @@ void JPC(int R, int L, int M)
         PC = M;
 }
 
-// 09 – SIO(R, 0, 1) Write a register to the screen.
-// 10 – SIO(R, 0, 2) Read in input from the user and store it in a register.
-// 11 – SIO(0, 0, 3) End of Program.
-void SIO(int R, int L, int M)
-{
-    switch (M)
-    {
-        case 1:
-        printf("%d\n", RF[R]);
-        break;
-
-        case 2:
-        scanf("%d", &RF[R]);
-        break;
-
-        // Stops the program.
-        case 3:
-        HALT = 1;
-        break;
-    }
-}
-
+// 09 - SIO(0, 0, 1)
+// 10 - SIO(0, 0, 2)
+// 11 - SIO(0, 0, 3)
 /* Note: i = R, j = L, k = M */
 
 // 12 - NEG() R[i] <- -R[j]
@@ -269,29 +227,12 @@ void GEQ(int R, int L, int M)
         RF[R] = 0;
 }
 
-int main(int argc, char **argv)
+void VM(instruction *text, FILE *output)
 {
     // Array of the instructions. The maximum size is 200 by definition
     // of MAX_CODE_LENGTH (200)
-    instruction *text = malloc(sizeof(instruction) * MAX_CODE_LENGTH);
-    FILE *input = fopen(argv[1], "r");
-    FILE *output = fopen(argv[2], "w");
     instruction IR;
     int line = 0;
-
-    // Syntax check.
-    if (argc < 3)
-    {
-        printf("Error: Improper syntax. Refer to the README for compilation instructions.\n");
-        return 0;
-    }
-    
-    // File not found check.
-    if (input == NULL)
-    {
-        printf("Input file does not exist.\n");
-        return 0;
-    }
 
     // Initializes all indices of the stack to 0.
     stack = calloc(MAX_STACK_HEIGHT, sizeof(int));
@@ -302,50 +243,42 @@ int main(int argc, char **argv)
     // Performs the first step of the "Output File" specifications. Fills the
     // Instruction struct defined above and prints out the program in interpreted
     // assembly language with line numbers.
-    printf("Line\tOP\tR\tL\tM\n");
-    fprintf(output, "Line\tOP\tR\tL\tM\n");
-    while (!feof(input))
+    if (isVMArg())
     {
-        // Fills instruction struct.
-        fscanf(input, "%d %d %d %d", &text[line].op, &text[line].R, &text[line].L, &text[line].M);
+        fprintf(output, "Virtual Machine Output:\n\n");
+        fprintf(output, "Line\tOP\tR\tL\tM\n");
 
-        // Outputs to the screen.
-        printf("%d\t%s\t%d\t%d\t%d\n", line, opStrings[text[line].op - 1], text[line].R, text[line].L, text[line].M);
+        while (text[line].op != 0)
+        {
+            // Outputs to the output file.
+            fprintf(output, "%d\t%s\t%d\t%d\t%d\n", line, opStrings[text[line].op - 1],
+            text[line].R, text[line].L, text[line].M);
 
-        // Outputs to the output file.
-        fprintf(output, "%d\t%s\t%d\t%d\t%d\n", line, opStrings[text[line].op - 1], text[line].R, text[line].L, text[line].M);
+            // Increment line #.
+            line++;
+        }
+        // Perfroms the actual program.
+        // Adjusts registers, data, stack, etc. as per the instruction.
+        // Will also print out the execution of the program as displayed
+        // in part (2) of the output file in Appendix C.
 
-        // Increment line #.
-        line += 1;
+        // Initial values
+        fprintf(output, "\n\t\t\tpc\tbp\tsp\tregisters\n");
+        fprintf(output, "Initial values\t\t0\t1\t0\t0 0 0 0 0 0 0 0\nStack: ");
+
+        for (int i = 0; i < MAX_STACK_HEIGHT; i++)
+            fprintf(output, "0 ");
+
+        fprintf(output, "\n\n\t\t\tpc\tbp\tsp\tregisters\n");   
     }
 
-    // Perfroms the actual program.
-    // Adjusts registers, data, stack, etc. as per the instruction.
-    // Will also print out the execution of the program as displayed
-    // in part (2) of the output file in Appendix C.
-
-    // Initial values
-    printf("\n\t\t\tpc\tbp\tsp\tregisters\n");
-    fprintf(output, "\n\t\t\tpc\tbp\tsp\tregisters\n");
-    printf("Initial values\t\t0\t1\t0\t0 0 0 0 0 0 0 0\nStack: ");
-    fprintf(output, "Initial values\t\t0\t1\t0\t0 0 0 0 0 0 0 0\nStack: ");
-
-    for (int i = 0; i < MAX_STACK_HEIGHT; i++)
-    {
-        printf("0 ");
-        fprintf(output, "0 ");
-    }
-
-    printf("\n\n\t\t\tpc\tbp\tsp\tregisters\n");
-    fprintf(output, "\n\n\t\t\tpc\tbp\tsp\tregisters\n");
     while (!HALT)
     {
         // FETCH
-        printf("%d ", PC);
-        fprintf(output, "%d ", PC);
+        if (isVMArg())
+            fprintf(output, "%d ", PC);
         IR = text[PC];
         PC = PC + 1;
-
         // EXECUTE
         switch (IR.op)
         {
@@ -354,9 +287,7 @@ int main(int argc, char **argv)
             LIT(IR.R, 0, IR.M);
             break;
 
-            // RTN
             case 2:
-            RTN(0, 0, 0);
             break;
 
             // LOD
@@ -369,9 +300,7 @@ int main(int argc, char **argv)
             STO(IR.R, IR.L, IR.M);
             break;
 
-            // CAL
             case 5:
-            CAL(0, IR.L, IR.M);
             break;
 
             // INC
@@ -391,17 +320,19 @@ int main(int argc, char **argv)
             
             // SIO (M = 1)
             case 9:
-            SIO(IR.R, 0, 1);
+            fprintf(output, "OUT: %d\n", RF[IR.R]);
             break;
 
             // SIO (M = 2)
             case 10:
-            SIO(IR.R, 0, 2);
+            fprintf(output, "IN: ");
+            scanf("%d", &RF[IR.R]);
+            fprintf(output, "%d\n", RF[IR.R]);
             break;
 
             // SIO (M = 3)
             case 11:
-            SIO(IR.R, 0, 3);
+            HALT = 1;
             break;
 
             // NEG
@@ -470,34 +401,27 @@ int main(int argc, char **argv)
             break;
         }
 
-        printf("%s %d %d %d\t", opStrings[IR.op - 1], IR.R, IR.L, IR.M);
-        fprintf(output, "%s %d %d %d\t", opStrings[IR.op - 1], IR.R, IR.L, IR.M);
-        printf("\t%d\t %d\t %d\t%d %d %d %d %d %d %d %d\n", PC, BP, SP, RF[0], RF[1], RF[2], RF[3], RF[4], RF[5], RF[6], RF[7]);
-        fprintf(output, "\t%d\t %d\t %d\t%d %d %d %d %d %d %d %d\n", PC, BP, SP, RF[0], RF[1], RF[2], RF[3], RF[4], RF[5], RF[6], RF[7]);
-        
-        printf("Stack: ");
-        fprintf(output, "Stack: ");
-
-        for (int i = 1; i <= SP; i++)
+        if (isVMArg())
         {
-            if (i > 1 && (i - 1) % 6 == 0)
+            fprintf(output, "%s %d %d %d\t", opStrings[IR.op - 1], IR.R, IR.L, IR.M);
+            fprintf(output, "\t%d\t %d\t %d\t%d %d %d %d %d %d %d %d\n", PC, BP, SP, RF[0], RF[1], RF[2], RF[3], RF[4], RF[5], RF[6], RF[7]);
+            fprintf(output, "Stack: ");
+
+            for (int i = 1; i <= SP; i++)
             {
-                printf("| ");
-                fprintf(output, "| ");
+                if (i > 1 && (i - 1) % 6 == 0)
+                    fprintf(output, "| ");
+
+                fprintf(output, "%d ", stack[i]);
             }
-            printf("%d ", stack[i]);
-            fprintf(output, "%d ", stack[i]);
+
+            fprintf(output, "\n\n");
         }
 
-        printf("\n\n");
-        fprintf(output, "\n\n");
     }
     
     // Close files and free allocated memory
     free(stack);
     free(RF);
-    free(text);
-    fclose(input);
-    fclose(output);
-    return 0;
+    return;
 }
