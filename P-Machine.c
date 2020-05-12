@@ -1,8 +1,3 @@
-// Names: Christian Young, Dustin Thompson
-// NIDs: ch890408, du738547
-// Course: COP 3402
-// Term: SPRING 2020
-
 #include <stdio.h>
 #include <stdlib.h>
 #define MAX_STACK_HEIGHT 40
