@@ -5,17 +5,20 @@
 
 #define MAX_INDENTIFIER_LENGTH 11
 #define MAX_NUMBER_LENGTH 5
+#define MAX_LEXEMES 500
 
 // Enum types representing each of the token symbols.
 typedef enum
 {
-    nulsym = 1, indentsym = 2, numbersym = 3, plussym = 4, minussym = 5, multsym = 6,
+    nulsym = 1, identsym = 2, numbersym = 3, plussym = 4, minussym = 5, multsym = 6,
     slashsym = 7, oddsym = 8, eqlsym = 9, neqsym = 10, lessym = 11, leqsym = 12,
     gtrsym = 13, geqsym = 14, lparentsym = 15, rparentsym = 16, commasym = 17,
     semicolonsym = 18, periodsym = 19, becomessym = 20, beginsym = 21, endsym = 22,
     ifsym = 23, thensym = 24, whilesym = 25, dosym = 26, callsym = 27, constsym = 28,
     varsym = 29, procsym = 30, writesym = 31, readsym = 32, elsym = 33
 } token_type;
+
+int isScannerArg();
 
 // Determines if the current string is an identifier.
 // If so, return 2 (the identifier token type).
@@ -26,12 +29,11 @@ int isIdent(char* string)
     if(!(string[0] >= 'a' && string[0] <= 'z') && !(string[0] >= 'A' && string[0] <= 'Z'))
         return 0;
 
-
     for(i = 1; i < strlen(string); i++)
         if(!(string[i] >= 'a' && string[i] <= 'z') && !(string[i] >= 'A' && string[i] <= 'Z') && !(string[i] >= '0' && string[i] <= '9'))
             return 0;
 
-    return indentsym;
+    return identsym;
 }
 
 // Determines if the current string is a digit.
@@ -135,52 +137,29 @@ int isReservedWord(char* string)
         return whilesym;
     else if(strcmp(string, "do") == 0)
         return dosym;
-    else if(strcmp(string, "call") == 0)
-        return callsym;
     else if(strcmp(string, "const") == 0)
         return constsym;
     else if(strcmp(string, "var") == 0)
         return varsym;
-    else if(strcmp(string, "procedure") == 0)
-        return procsym;
     else if(strcmp(string, "write") == 0)
         return writesym;
     else if(strcmp(string, "read") == 0)
         return readsym;
-    else if(strcmp(string, "else") == 0)
-        return elsym;
-
+        
     return 0;
 }
 
-int main(int argc, char **argv)
+char **LexicallyAnalyze(FILE *input, FILE *output)
 {
-    FILE *input = fopen(argv[1], "r");
-    FILE *output = fopen(argv[2], "w");
-    int tokenType = 0, charCount = 0, i = 0;
-    char **identList = calloc(500, sizeof(char*));
-    int *tokenList = calloc(500, sizeof(int));
+    int tokenType = 0, i = 0;
+    char **lexemeList = calloc(MAX_LEXEMES, sizeof(char*));
     char *str = calloc(11, sizeof(char));
+    char *sp = calloc(3, sizeof(char));
     char ch = '\0', c;
-    int flag = 0;
-
-    // Syntax check.
-    if (argc < 3)
-    {
-        fprintf(output, "Error: Improper syntax. Refer to the README for compilation instructions.\n");
-        return 0;
-    }
-
-    // File not found check.
-    if (input == NULL)
-    {
-        fprintf(output, "Input file does not exist.\n");
-        return 0;
-    }
 
     // Prints the first part of the output specifications and rewinds the file pointer.
     c = fgetc(input);
-    fprintf(output, "Source Program:\n");
+    fprintf(output, "Scanner input:\n\n");
 
     while(c != EOF)
     {
@@ -191,8 +170,6 @@ int main(int argc, char **argv)
     fprintf(output, "\n\n");
     rewind(input);
 
-    // Lexically analyzes the program and prints the lexeme table simultaneously.
-    fprintf(output, "Lexeme Table:\nlexeme\t\ttoken type\n");
     while (1)
     {
         ch = fgetc(input);
@@ -232,11 +209,10 @@ int main(int argc, char **argv)
         // If the current token one of the operators.
         if(tokenType = isSign(str))
         {
-            // Print the token and its associated type to the output file.
-            fprintf(output, "%s\t\t%d\n", str, tokenType);
-
             // Populate the tokenList with the associated token type.
-            tokenList[i++] = tokenType;
+            sprintf(sp, "%d", tokenType);
+            lexemeList[i] = calloc(strlen(sp), sizeof(char));
+            strcpy(lexemeList[i++], sp);
 
             // Reset the current string.
             strcpy(str, "");
@@ -264,14 +240,14 @@ int main(int argc, char **argv)
                     exit(0);
                 }
 
-                // Print the token and its associated type to the output file.
-                fprintf(output, "%s\t\t%d\n", str, tokenType);
-
                 // Update the token list array with the current token, allocate
                 // space in the identifier list for the string and insert it.
-                tokenList[i] = tokenType;
-                identList[i] = calloc(strlen(str), sizeof(char));
-                strcpy(identList[i++], str);
+                sprintf(sp, "%d", tokenType);
+                lexemeList[i] = calloc(strlen(sp), sizeof(char));
+                strcpy(lexemeList[i++], sp);
+
+                lexemeList[i] = calloc(strlen(str), sizeof(char));
+                strcpy(lexemeList[i++], str);
 
                 // Reset the string and replace it with the current character.
                 strcpy(str, "");
@@ -294,11 +270,10 @@ int main(int argc, char **argv)
             // If the current token is one of the reserved words.
             if(tokenType = isReservedWord(str))
             {
-                // Print the token and its associated type to the output file.
-                fprintf(output, "%s\t\t%d\n", str, tokenType);
-
                 // Update the token list array with the current token.
-                tokenList[i++] = tokenType;
+                sprintf(sp, "%d", tokenType);
+                lexemeList[i] = calloc(strlen(sp), sizeof(char));
+                strcpy(lexemeList[i++], sp);
                 
                 // Reset the string and replace it with the current character.
                 strcpy(str, "");
@@ -321,14 +296,14 @@ int main(int argc, char **argv)
                     exit(0);
                 }
 
-                // Print the token and its associated type to the output file.
-                fprintf(output, "%s\t\t%d\n", str, tokenType);
-
                 // Update the token list array with the current token, allocate
                 // space in the identifier list for the string and insert it.
-                tokenList[i] = tokenType;
-                identList[i] = calloc(strlen(str), sizeof(char));
-                strcpy(identList[i++], str);
+                sprintf(sp, "%d", tokenType);
+                lexemeList[i] = calloc(strlen(sp), sizeof(char));
+                strcpy(lexemeList[i++], sp);
+
+                lexemeList[i] = calloc(strlen(str), sizeof(char));
+                strcpy(lexemeList[i++], str);
                 
                 // Reset the string and replace it with the current character.
                 strcpy(str, "");
@@ -355,14 +330,14 @@ int main(int argc, char **argv)
                 exit(0);
             }
 
-            // Print the token and its associated type to the output file.
-            fprintf(output, "%s\t\t%d\n", str, tokenType);
-
             // Update the token list array with the current token, allocate
             // space in the identifier list for the string and insert it.
-            tokenList[i] = tokenType;
-            identList[i] = calloc(strlen(str), sizeof(char));
-            strcpy(identList[i++], str);
+            sprintf(sp, "%d", tokenType);
+            lexemeList[i] = calloc(strlen(sp), sizeof(char));
+            strcpy(lexemeList[i++], sp);
+
+            lexemeList[i] = calloc(strlen(str), sizeof(char));
+            strcpy(lexemeList[i++], str);
             
             // Reset the string and replace it with the current character.
             strcpy(str, "");
@@ -391,14 +366,14 @@ int main(int argc, char **argv)
                     exit(0);
                 }
 
-                // Print the token and its associated type to the output file.
-                fprintf(output, "%s\t\t%d\n", str, tokenType);
-
                 // Update the token list array with the current token, allocate
                 // space in the identifier list for the string and insert it.
-                tokenList[i] = tokenType;
-                identList[i] = calloc(strlen(str), sizeof(char));
-                strcpy(identList[i++], str);
+                sprintf(sp, "%d", tokenType);
+                lexemeList[i] = calloc(strlen(sp), sizeof(char));
+                strcpy(lexemeList[i++], sp);
+
+                lexemeList[i] = calloc(strlen(str), sizeof(char));
+                strcpy(lexemeList[i++], str);
 
                 // Reset the string.
                 strcpy(str, "");
@@ -413,11 +388,10 @@ int main(int argc, char **argv)
             // If the token is one of the operators.
             if(tokenType = isSign(str))
             {
-                // Print the token and its associated type to the output file.
-                fprintf(output, "%s\t\t%d\n", str, tokenType);
-
                 // Update the token list array with the current token.
-                tokenList[i++] = tokenType;
+                sprintf(sp, "%d", tokenType);
+                lexemeList[i] = calloc(strlen(sp), sizeof(char));
+                strcpy(lexemeList[i++], sp);
 
                 // Reset the string.
                 strcpy(str, "");
@@ -432,11 +406,10 @@ int main(int argc, char **argv)
             // If the current token is one of the reserved words.
             if(tokenType = isReservedWord(str))
             {
-                // Print the token and its associated type to the output file.
-                fprintf(output, "%s\t\t%d\n", str, tokenType);
-
                 // Update the token list array with the current token.
-                tokenList[i++] = tokenType;
+                sprintf(sp, "%d", tokenType);
+                lexemeList[i] = calloc(strlen(sp), sizeof(char));
+                strcpy(lexemeList[i++], sp);
 
                 // Reset the string.
                 strcpy(str, "");
@@ -465,14 +438,14 @@ int main(int argc, char **argv)
                     exit(0);
                 }
 
-                // Print the token and its associated type to the output file.
-                fprintf(output, "%s\t\t%d\n", str, tokenType);
-
                 // Update the token list array with the current token, allocate
                 // space in the identifier list for the string and insert it.
-                tokenList[i] = tokenType;
-                identList[i] = calloc(strlen(str), sizeof(char));
-                strcpy(identList[i++], str);
+                sprintf(sp, "%d", tokenType);
+                lexemeList[i] = calloc(strlen(sp), sizeof(char));
+                strcpy(lexemeList[i++], sp);
+
+                lexemeList[i] = calloc(strlen(str), sizeof(char));
+                strcpy(lexemeList[i++], str);
 
                 // Reset the string.
                 strcpy(str, "");
@@ -495,26 +468,126 @@ int main(int argc, char **argv)
     }
 
     // Prints lexeme list
-    fprintf(output, "\nLexeme List:\n");
-    for (int k = 0; k < 500; k++)
+    if (isScannerArg())
     {
-        if (tokenList[k] == 0)
-            break;
-        fprintf(output, "%d ", tokenList[k]);
+        fprintf(output, "Scanner output:\n\n");
 
-        if (tokenList[k] == 2 || tokenList[k] == 3)
-            fprintf(output, "%s ", identList[k]);
+        for (int k = 0; k < MAX_LEXEMES; k++)
+        {
+            if (lexemeList[k] == NULL)
+                break;
+            fprintf(output, "%s ", lexemeList[k]);
         }
-    fprintf(output, "\n");
+        
+        fprintf(output, "\n");
+        for (int k = 0; k < MAX_LEXEMES; k++)
+        {
+            if (lexemeList[k] == NULL)
+                break;
 
+            if (strcmp(lexemeList[k], "1") == 0)
+                fprintf(output, "nulsym ");
 
-    // Free all allocated memory and close all files.
-    for (int j = 0; j < 500; j++)
-        free(identList[j]);
+            if (strcmp(lexemeList[k], "2") == 0)
+                fprintf(output, "identsym ");
+
+            if (strcmp(lexemeList[k], "3") == 0)
+                fprintf(output, "numbersym ");
+
+            if (strcmp(lexemeList[k], "4") == 0)
+                fprintf(output, "plussym ");
+
+            if (strcmp(lexemeList[k], "5") == 0)
+                fprintf(output, "minussym ");
+
+            if (strcmp(lexemeList[k], "6") == 0)
+                fprintf(output, "multsym ");
+
+            if (strcmp(lexemeList[k], "7") == 0)
+                fprintf(output, "slashsym ");
+
+            if (strcmp(lexemeList[k], "8") == 0)
+                fprintf(output, "oddsym ");
+
+            if (strcmp(lexemeList[k], "9") == 0)
+                fprintf(output, "eqlsym ");
+
+            if (strcmp(lexemeList[k], "10") == 0)
+                fprintf(output, "neqsym ");
+
+            if (strcmp(lexemeList[k], "11") == 0)
+                fprintf(output, "lesssym ");
+
+            if (strcmp(lexemeList[k], "12") == 0)
+                fprintf(output, "leqsym ");
+
+            if (strcmp(lexemeList[k], "13") == 0)
+                fprintf(output, "gtrsym ");
+
+            if (strcmp(lexemeList[k], "14") == 0)
+                fprintf(output, "geqsym ");
+
+            if (strcmp(lexemeList[k], "15") == 0)
+                fprintf(output, "lparentsym ");
+
+            if (strcmp(lexemeList[k], "16") == 0)
+                fprintf(output, "rparentsym ");
+
+            if (strcmp(lexemeList[k], "17") == 0)
+                fprintf(output, "commasym ");
+
+            if (strcmp(lexemeList[k], "18") == 0)
+                fprintf(output, "semicolonsym ");
+                
+            if(strcmp(lexemeList[k], "19") == 0)
+                fprintf(output, "periodsym ");
+
+            if (strcmp(lexemeList[k], "20") == 0)
+                fprintf(output, "becomessym ");
+
+            if (strcmp(lexemeList[k], "21") == 0)
+                fprintf(output, "beginsym ");
+
+            if (strcmp(lexemeList[k], "22") == 0)
+                fprintf(output, "endsym ");
+
+            if (strcmp(lexemeList[k], "23") == 0)
+                fprintf(output, "ifsym ");
+
+            if (strcmp(lexemeList[k], "24") == 0)
+                fprintf(output, "thensym ");
+
+            if (strcmp(lexemeList[k], "25") == 0)
+                fprintf(output, "whilesym ");
+
+            if (strcmp(lexemeList[k], "26") == 0)
+                fprintf(output, "dosym ");
+
+            if (strcmp(lexemeList[k], "27") == 0)
+                fprintf(output, "callsym ");
+
+            if (strcmp(lexemeList[k], "28") == 0)
+                fprintf(output, "constsym ");
+
+            if (strcmp(lexemeList[k], "29") == 0)
+                fprintf(output, "varsym ");
+
+            if (strcmp(lexemeList[k], "30") == 0)
+                fprintf(output, "procsym ");
+
+            if (strcmp(lexemeList[k], "31") == 0)
+                fprintf(output, "writesym ");
+
+            if (strcmp(lexemeList[k], "32") == 0)
+                fprintf(output, "readsym ");
+
+            if (strcmp(lexemeList[k], "33") == 0)
+                fprintf(output, "elsesym ");
+        }
+    }
+    fprintf(output, "\n\n");
+
+    free(sp);
     free(str);
-    fclose(input);
-    fclose(output);
-    free(tokenList);
-    free(identList);
-    return 0;
+    return lexemeList;
 }
